@@ -3,8 +3,8 @@ const App = function() {
     let [currentPlanet, setCurrentPlanet] = React.useState(null);
     let [tableRowData, setTableRowData] = React.useState([null, null, null, null, null]);
     let requestAbortController = React.useRef(new AbortController());
-    let currentUrl = React.useRef('http://localhost:3000/dark-jedis/5105')
-    let currentUrlUp = React.useRef('http://localhost:3000/dark-jedis/2350')  
+    let currentUrl = React.useRef('http://localhost:3000/dark-jedis/4601')
+    let currentUrlUp = React.useRef('http://localhost:3000/dark-jedis/4629')  
     let direction = React.useRef('down');
     let ws = React.useRef(null);
     let upBtnDisable = (currentUrlUp.current === null) || tableRowData.some(row => row !== null && row.homeworld.name === currentPlanet);
@@ -13,14 +13,10 @@ const App = function() {
     let downBtnClass = downBtnDisable ? "css-button-down css-button-disabled" : "css-button-down"
 
     let fetchOnce = function(url) {
+        console.log("fetching down");
         return fetch(url, { signal: requestAbortController.current.signal }).then((response) => {
             return response.json();
         }).then((data) =>  {
-            currentUrl.current = data.apprentice.url;
-            if(tableRowData[0]){
-                currentUrlUp.current = tableRowData[0].master.url;
-            }
-            
             setTableRowData(currentRows => {
                 let newRowArray = []
                 let firstNullIndex = currentRows.indexOf(null);
@@ -43,8 +39,6 @@ const App = function() {
         return fetch(url, { signal: requestAbortController.current.signal }).then((response) => {
             return response.json();
         }).then((data) =>  {
-            currentUrlUp.current = data.master.url;
-            currentUrl.current = tableRowData[4].apprentice.url;
             setTableRowData(currentRows => {
                 let newRowArray = []
                 let lastNullIndex = currentRows.lastIndexOf(null);
@@ -65,6 +59,26 @@ const App = function() {
     React.useEffect(() => {
         let currentPlanetFound = tableRowData.some(row => row !== null && row.homeworld.name === currentPlanet);
         if (currentPlanetFound) {
+            requestAbortController.current.abort()
+        }
+    }, [currentPlanet])
+
+    React.useEffect(() => {
+        if (!tableRowData.every(row => row === null)) {
+            let firstNullIndex = tableRowData.indexOf(null);
+            let firstNonNullIndex = tableRowData.findIndex(row => row !== null);
+
+            currentUrl.current = firstNullIndex === -1 ? tableRowData[4].apprentice.url : tableRowData[firstNullIndex - 1].apprentice.url;
+            
+            currentUrlUp.current = tableRowData[firstNonNullIndex].master.url;
+            
+        }
+        
+
+
+        let currentPlanetFound = tableRowData.some(row => row !== null && row.homeworld.name === currentPlanet);
+        if (currentPlanetFound) {
+            console.log("aborting from useEffect")
             requestAbortController.current.abort()
         }
         else if (!currentPlanetFound && tableRowData.indexOf(null) !== -1 && currentUrl.current !== null&&direction.current ==='down') {
@@ -89,13 +103,15 @@ const App = function() {
     }, []);
 
     let handleDownScroll = () => {
+        console.log("aborting from down scroll");
+        requestAbortController.current.abort();
         direction.current= 'down';
         setTableRowData((previousRows) => [...previousRows.slice(2), null, null]);
     };
     
     let handleUpScroll = () =>{
+        requestAbortController.current.abort();
         direction.current= 'up';
-        
         setTableRowData((previousRows) => [null, null, ...previousRows.splice(0,3)]);
     }
     const children = tableRowData.map((data, idx) =>{
