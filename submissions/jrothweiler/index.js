@@ -2,16 +2,18 @@ const App = function() {
 
     let [currentPlanet, setCurrentPlanet] = React.useState(null);
     let [tableRowData, setTableRowData] = React.useState([null, null, null, null, null]);
+    let requestAbortController = React.useRef(new AbortController());
     let currentUrl = React.useRef('http://localhost:3000/dark-jedis/5105')
     let currentUrlUp = React.useRef('http://localhost:3000/dark-jedis/2350')  
     let direction = React.useRef('down');
     let ws = React.useRef(null);
-    let upBtnClass = currentUrlUp.current !== null ? "css-button-up" : "css-button-up css-button-disabled"
-    let downBtnClass = currentUrl.current !== null ? "css-button-down" : "css-button-down css-button-disabled"
-    let upBtnDisable = currentUrlUp.current === null 
-    let downBtnDisable = currentUrl.current === null
+    let upBtnDisable = (currentUrlUp.current === null) || tableRowData.some(row => row !== null && row.homeworld.name === currentPlanet);
+    let downBtnDisable = (currentUrl.current === null )|| tableRowData.some(row => row !== null && row.homeworld.name === currentPlanet);
+    let upBtnClass = upBtnDisable ? "css-button-up css-button-disabled" : "css-button-up"
+    let downBtnClass = downBtnDisable ? "css-button-down css-button-disabled" : "css-button-down"
+
     let fetchOnce = function(url) {
-        return fetch(url).then((response) => {
+        return fetch(url, { signal: requestAbortController.current.signal }).then((response) => {
             return response.json();
         }).then((data) =>  {
             currentUrl.current = data.apprentice.url;
@@ -21,7 +23,6 @@ const App = function() {
             
             setTableRowData(currentRows => {
                 let newRowArray = []
-                //console.log(data);
                 let firstNullIndex = currentRows.indexOf(null);
                 currentRows.forEach((row, inx) => {
                     if(inx === firstNullIndex) {
@@ -39,14 +40,13 @@ const App = function() {
     }
 
     let fetchOnceUp = function(url) {
-        return fetch(url).then((response) => {
+        return fetch(url, { signal: requestAbortController.current.signal }).then((response) => {
             return response.json();
         }).then((data) =>  {
             currentUrlUp.current = data.master.url;
             currentUrl.current = tableRowData[4].apprentice.url;
             setTableRowData(currentRows => {
                 let newRowArray = []
-                console.log(data);
                 let lastNullIndex = currentRows.lastIndexOf(null);
                 currentRows.forEach((row, inx) => {
                     if(inx === lastNullIndex) {
@@ -63,10 +63,13 @@ const App = function() {
     }
 
     React.useEffect(() => {
-        console.log("Effect");
-        if (tableRowData.indexOf(null) !== -1 && currentUrl.current !== null&&direction.current ==='down') {
+        let currentPlanetFound = tableRowData.some(row => row !== null && row.homeworld.name === currentPlanet);
+        if (currentPlanetFound) {
+            requestAbortController.current.abort()
+        }
+        else if (!currentPlanetFound && tableRowData.indexOf(null) !== -1 && currentUrl.current !== null&&direction.current ==='down') {
             fetchOnce(currentUrl.current)
-        }else if(tableRowData.indexOf(null) !== -1 && currentUrlUp.current !== null&&direction.current ==='up'){
+        }else if(!currentPlanetFound && tableRowData.indexOf(null) !== -1 && currentUrlUp.current !== null&&direction.current ==='up'){
             fetchOnceUp(currentUrlUp.current);
         }
     }, [tableRowData]);
@@ -101,7 +104,8 @@ const App = function() {
                     
                   
         }else {
-            return <li className="css-slot" key={data.name}>
+            let currentPlanetCssClass = currentPlanet === data.homeworld.name ? "css-slot currentPlanet" : "css-slot"
+            return <li className={currentPlanetCssClass} key={data.name}>
                     <h3>{data.name}</h3>
                     <h6>Homeworld: {data.homeworld.name}</h6>
                    </li>
